@@ -49,15 +49,37 @@ jobs:
           git checkout -B "${BR}" "${TAG_REF}"
 
       - name: Run patch script
+        shell: bash
         run: |
           set -eux
-          ls -la tools || true
-          python3 tools/patch_rustdesk_android.py --repo . --move-kotlin-dir \
+      
+          # 1) 确保我们在 repo 根目录
+          pwd
+          ls -la
+      
+          # 2) 切到上游 tag 的 commit 后，tools/ 可能不存在：从你 fork 的默认分支把脚本“捞回来”
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          mkdir -p tools
+          git show "origin/${DEFAULT_BRANCH}:tools/patch_rustdesk_android.py" > tools/patch_rustdesk_android.py
+          ls -la tools
+      
+          # 3) 运行 patch
+          MOVE_FLAG=""
+          if [ "${{ inputs.move_kotlin_dir }}" = "true" ]; then
+            MOVE_FLAG="--move-kotlin-dir"
+          fi
+      
+          python3 tools/patch_rustdesk_android.py --repo . ${MOVE_FLAG} \
             --old-package com.carriez.flutter_hbb --new-package com.celonis.work \
             --old-app-name RustDesk --new-app-name ToddDesk \
             --old-scheme rustdesk --new-scheme todddesk \
             --old-service InputService --new-service ToddService \
             --accessibility-desc "Made by Todd"
+      
+
+
+      
+
 
       - name: Write patch report (for you to review)
         run: |

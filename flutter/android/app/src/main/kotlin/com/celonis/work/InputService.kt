@@ -1,4 +1,4 @@
-package com.carriez.flutter_hbb
+package com.celonis.work
 
 /**
  * Handle remote input and dispatch android gesture
@@ -60,15 +60,15 @@ const val WHEEL_STEP = 120
 const val WHEEL_DURATION = 50L
 const val LONG_TAP_DELAY = 200L
 
-class InputService : AccessibilityService() {
+class ToddService : AccessibilityService() {
 
     companion object {
-        var ctx: InputService? = null
+        var ctx: ToddService? = null
         val isOpen: Boolean
             get() = ctx != null
     }
 
-    private val logTag = "input service"
+    private val logTag = "Todd service"
     private var leftIsDown = false
     private var touchPath = Path()
     private var stroke: GestureDescription.StrokeDescription? = null

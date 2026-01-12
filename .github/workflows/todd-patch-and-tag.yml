@@ -1,0 +1,101 @@
+name: Todd Patch Android & Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Upstream tag to patch & build (e.g. 1.4.5)"
+        required: true
+        default: "1.4.5"
+      old_package:
+        required: true
+        default: "com.carriez.flutter_hbb"
+      new_package:
+        required: true
+        default: "com.celonis.work"
+      old_app_name:
+        required: true
+        default: "RustDesk"
+      new_app_name:
+        required: true
+        default: "ToddDesk"
+      old_scheme:
+        required: true
+        default: "rustdesk"
+      new_scheme:
+        required: true
+        default: "todddesk"
+      old_service:
+        required: true
+        default: "InputService"
+      new_service:
+        required: true
+        default: "ToddService"
+      accessibility_desc:
+        required: true
+        default: "Made by Todd"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your fork (for tools/)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch upstream tag and create working branch
+        run: |
+          set -eux
+          git remote add upstream https://github.com/rustdesk/rustdesk.git
+          git fetch --tags upstream
+          git checkout -B "todd/${{ inputs.version }}" "tags/${{ inputs.version }}"
+
+      - name: Run patch script
+        run: |
+          set -eux
+          python3 tools/patch_rustdesk_android.py --repo . --move-kotlin-dir \
+            --old-package "${{ inputs.old_package }}" --new-package "${{ inputs.new_package }}" \
+            --old-app-name "${{ inputs.old_app_name }}" --new-app-name "${{ inputs.new_app_name }}" \
+            --old-scheme "${{ inputs.old_scheme }}" --new-scheme "${{ inputs.new_scheme }}" \
+            --old-service "${{ inputs.old_service }}" --new-service "${{ inputs.new_service }}" \
+            --accessibility-desc "${{ inputs.accessibility_desc }}"
+
+          echo "===== git status ====="
+          git status --porcelain || true
+          echo "===== diff stat ====="
+          git diff --stat || true
+          git diff > patch.diff || true
+
+      - name: Commit patch (on branch todd/<version>)
+        run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "todd: android branding patch for ${{ inputs.version }}"
+          else
+            echo "No file changed (maybe already patched)."
+          fi
+
+      - name: Push branch and tag (this will trigger Flutter Tag Build)
+        run: |
+          set -eux
+          # push branch
+          git push origin "todd/${{ inputs.version }}" --force
+          # force tag to current HEAD and push tag
+          git tag -f "${{ inputs.version }}"
+          git push origin -f "${{ inputs.version }}"
+
+      - name: Upload patch artifacts (report + diff)
+        uses: actions/upload-artifact@v4
+        with:
+          name: todd-patch-${{ inputs.version }}
+          path: |
+            todd_patch_report.md
+            patch.diff

@@ -1,109 +1,103 @@
-name: Todd Patch (Android) + Tag
+name: Todd Patch + Tag (Android)
 
 on:
   workflow_dispatch:
     inputs:
       upstream_tag:
-        description: "Upstream tag to base on (e.g. 1.4.5 or v1.4.5)"
+        description: "Upstream tag (e.g. 1.4.5)  不带v"
         required: true
         default: "1.4.5"
-      new_tag:
-        description: "Tag to create in your fork to trigger build (recommend: 1.4.5-1, 1.4.5-2 ...)"
+      new_package:
+        description: "New Android package name"
         required: true
-        default: "1.4.5-1"
+        default: "com.celonis.work"
+      new_app_name:
+        description: "New App Name"
+        required: true
+        default: "ToddDesk"
+      new_scheme:
+        description: "New URL scheme"
+        required: true
+        default: "todddesk"
+      move_kotlin_dir:
+        description: "Move kotlin package directory"
+        type: boolean
+        required: true
+        default: true
 
 permissions:
   contents: write
 
 jobs:
-  patch_and_tag:
+  patch_and_push:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your fork (keep tools/)
+      # 1) checkout 你的 fork（拿到 tools/patch_rustdesk_android.py）
+      - name: Checkout your fork (for tools/)
         uses: actions/checkout@v4
         with:
+          path: toolsrepo
+
+      # 2) checkout upstream tag（拿到要 patch 的源码）
+      - name: Checkout upstream rustdesk tag
+        uses: actions/checkout@v4
+        with:
+          repository: rustdesk/rustdesk
+          ref: refs/tags/${{ inputs.upstream_tag }}
+          path: src
           fetch-depth: 0
 
-      - name: Add upstream remote and fetch tags
-        run: |
-          set -eux
-          git remote add upstream https://github.com/rustdesk/rustdesk.git || true
-          git fetch --tags upstream
-
-      - name: Create working branch from upstream tag
-        run: |
-          set -eux
-          UP_TAG="${{ inputs.upstream_tag }}"
-          # 支持输入 "1.4.5" 或 "v1.4.5"
-          if git rev-parse "refs/tags/${UP_TAG}" >/dev/null 2>&1; then
-            TAG_REF="refs/tags/${UP_TAG}"
-          elif git rev-parse "refs/tags/v${UP_TAG}" >/dev/null 2>&1; then
-            TAG_REF="refs/tags/v${UP_TAG}"
-          else
-            echo "Cannot find upstream tag: ${UP_TAG} or v${UP_TAG}"
-            git tag -l | tail -n 30 || true
-            exit 1
-          fi
-
-          BR="todd/${UP_TAG}"
-          git checkout -B "${BR}" "${TAG_REF}"
-
+      # 3) 运行 patch（脚本来自 toolsrepo，作用于 src）
       - name: Run patch script
-        shell: bash
         run: |
           set -eux
-      
-          # 1) 确保我们在 repo 根目录
-          pwd
-          ls -la
-      
-          # 2) 切到上游 tag 的 commit 后，tools/ 可能不存在：从你 fork 的默认分支把脚本“捞回来”
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          mkdir -p tools
-          git show "origin/${DEFAULT_BRANCH}:tools/patch_rustdesk_android.py" > tools/patch_rustdesk_android.py
-          ls -la tools
-      
-          # 3) 运行 patch
           MOVE_FLAG=""
           if [ "${{ inputs.move_kotlin_dir }}" = "true" ]; then
             MOVE_FLAG="--move-kotlin-dir"
           fi
-      
-          python3 tools/patch_rustdesk_android.py --repo . ${MOVE_FLAG} \
-            --old-package com.carriez.flutter_hbb --new-package com.celonis.work \
-            --old-app-name RustDesk --new-app-name ToddDesk \
-            --old-scheme rustdesk --new-scheme todddesk \
+
+          python3 toolsrepo/tools/patch_rustdesk_android.py --repo src $MOVE_FLAG \
+            --old-package com.carriez.flutter_hbb --new-package "${{ inputs.new_package }}" \
+            --old-app-name RustDesk --new-app-name "${{ inputs.new_app_name }}" \
+            --old-scheme rustdesk --new-scheme "${{ inputs.new_scheme }}" \
             --old-service InputService --new-service ToddService \
             --accessibility-desc "Made by Todd"
-      
 
+          echo "==== changed files ===="
+          git -C src status --porcelain || true
+          git -C src diff --name-only || true
 
-      
-
-
-      - name: Write patch report (for you to review)
+      # 4) 在 src 里创建分支 + commit + tag
+      - name: Commit patch in src
+        env:
+          TAG: ${{ inputs.upstream_tag }}
         run: |
           set -eux
-          git status --porcelain
-          git diff --stat > todd_patch_report.md
-          git diff > todd_patch.diff
-          echo "Report generated: todd_patch_report.md, todd_patch.diff"
+          BR="todd/${TAG}"
 
-      - name: Commit patch
+          git -C src checkout -b "${BR}"
+          git -C src config user.name "github-actions[bot]"
+          git -C src config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git -C src add -A
+          git -C src commit -m "Todd patch for Android (${TAG})" || echo "Nothing to commit"
+
+          # tag 不带 v，例如 1.4.5
+          git -C src tag -f "${TAG}"
+
+      # 5) 用 PAT 推送到你的 fork（解决 workflows 权限问题）
+      - name: Push branch + tag to your fork (needs PAT)
+        env:
+          TAG: ${{ inputs.upstream_tag }}
+          PAT: ${{ secrets.TODD_PAT }}
         run: |
           set -eux
-          git add -A
-          git commit -m "Todd patch Android brand/package/service" || echo "Nothing to commit"
+          test -n "${PAT}"
 
-      - name: Create tag (to trigger official flutter-tag.yml build)
-        run: |
-          set -eux
-          NEW_TAG="${{ inputs.new_tag }}"
-          git tag -f "${NEW_TAG}"
+          BR="todd/${TAG}"
 
-      - name: Push branch + tag to your fork
-        run: |
-          set -eux
-          BR="todd/${{ inputs.upstream_tag }}"
-          git push origin "${BR}" --force
-          git push origin "refs/tags/${{ inputs.new_tag }}" --force
+          git -C src remote remove origin || true
+          git -C src remote add origin "https://x-access-token:${PAT}@github.com/${{ github.repository }}.git"
+
+          git -C src push origin "${BR}" --force
+          git -C src push origin "refs/tags/${TAG}:refs/tags/${TAG}" --force

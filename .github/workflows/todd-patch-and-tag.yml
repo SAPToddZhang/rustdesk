@@ -1,52 +1,16 @@
-name: Todd - Patch Android & Tag Build
+name: Todd Patch (Android) + Tag
 
 on:
   workflow_dispatch:
     inputs:
       upstream_tag:
-        description: "RustDesk upstream tag (e.g. 1.4.5)"
+        description: "Upstream tag to base on (e.g. 1.4.5 or v1.4.5)"
         required: true
         default: "1.4.5"
-      old_package:
-        description: "Old Android package"
+      new_tag:
+        description: "Tag to create in your fork to trigger build (recommend: 1.4.5-1, 1.4.5-2 ...)"
         required: true
-        default: "com.carriez.flutter_hbb"
-      new_package:
-        description: "New Android package"
-        required: true
-        default: "com.celonis.work"
-      old_app_name:
-        description: "Old app name"
-        required: true
-        default: "RustDesk"
-      new_app_name:
-        description: "New app name"
-        required: true
-        default: "ToddDesk"
-      old_scheme:
-        description: "Old scheme"
-        required: true
-        default: "rustdesk"
-      new_scheme:
-        description: "New scheme"
-        required: true
-        default: "todddesk"
-      old_service:
-        description: "Old service class"
-        required: true
-        default: "InputService"
-      new_service:
-        description: "New service class"
-        required: true
-        default: "ToddService"
-      accessibility_desc:
-        description: "Accessibility service description"
-        required: true
-        default: "Made by Todd"
-      move_kotlin_dir:
-        description: "Move kotlin package directory"
-        required: true
-        default: "true"
+        default: "1.4.5-1"
 
 permissions:
   contents: write
@@ -55,74 +19,69 @@ jobs:
   patch_and_tag:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout your fork (this repo, includes tools/)
+      - name: Checkout your fork (keep tools/)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Ensure tools script exists
-        run: |
-          set -eux
-          ls -la tools
-          test -f tools/patch_rustdesk_android.py
-
-      - name: Fetch upstream tag into this repo
+      - name: Add upstream remote and fetch tags
         run: |
           set -eux
           git remote add upstream https://github.com/rustdesk/rustdesk.git || true
-          git fetch upstream --tags --force
-          git tag -l | tail -n 20
-          git show-ref --tags | grep "refs/tags/${{ inputs.upstream_tag }}" || (echo "Tag not found: ${{ inputs.upstream_tag }}" && exit 1)
+          git fetch --tags upstream
 
       - name: Create working branch from upstream tag
         run: |
           set -eux
-          BR="todd/${{ inputs.upstream_tag }}"
-          git checkout -B "$BR" "refs/tags/${{ inputs.upstream_tag }}"
-          echo "Now on $(git rev-parse --abbrev-ref HEAD) @ $(git rev-parse HEAD)"
+          UP_TAG="${{ inputs.upstream_tag }}"
+          # 支持输入 "1.4.5" 或 "v1.4.5"
+          if git rev-parse "refs/tags/${UP_TAG}" >/dev/null 2>&1; then
+            TAG_REF="refs/tags/${UP_TAG}"
+          elif git rev-parse "refs/tags/v${UP_TAG}" >/dev/null 2>&1; then
+            TAG_REF="refs/tags/v${UP_TAG}"
+          else
+            echo "Cannot find upstream tag: ${UP_TAG} or v${UP_TAG}"
+            git tag -l | tail -n 30 || true
+            exit 1
+          fi
+
+          BR="todd/${UP_TAG}"
+          git checkout -B "${BR}" "${TAG_REF}"
 
       - name: Run patch script
         run: |
           set -eux
-          MOVE_FLAG=""
-          if [ "${{ inputs.move_kotlin_dir }}" = "true" ]; then
-            MOVE_FLAG="--move-kotlin-dir"
-          fi
+          ls -la tools || true
+          python3 tools/patch_rustdesk_android.py --repo . --move-kotlin-dir \
+            --old-package com.carriez.flutter_hbb --new-package com.celonis.work \
+            --old-app-name RustDesk --new-app-name ToddDesk \
+            --old-scheme rustdesk --new-scheme todddesk \
+            --old-service InputService --new-service ToddService \
+            --accessibility-desc "Made by Todd"
 
-          python3 tools/patch_rustdesk_android.py \
-            --repo . \
-            $MOVE_FLAG \
-            --old-package "${{ inputs.old_package }}" --new-package "${{ inputs.new_package }}" \
-            --old-app-name "${{ inputs.old_app_name }}" --new-app-name "${{ inputs.new_app_name }}" \
-            --old-scheme "${{ inputs.old_scheme }}" --new-scheme "${{ inputs.new_scheme }}" \
-            --old-service "${{ inputs.old_service }}" --new-service "${{ inputs.new_service }}" \
-            --accessibility-desc "${{ inputs.accessibility_desc }}"
-
-          echo "---- git status ----"
-          git status --porcelain || true
-
-      - name: Commit patch to branch
+      - name: Write patch report (for you to review)
         run: |
           set -eux
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git status --porcelain
+          git diff --stat > todd_patch_report.md
+          git diff > todd_patch.diff
+          echo "Report generated: todd_patch_report.md, todd_patch.diff"
 
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No changes after patch. Stop."
-            exit 0
-          fi
-
+      - name: Commit patch
+        run: |
+          set -eux
           git add -A
-          git commit -m "Todd patch for Android (base ${{ inputs.upstream_tag }})"
-          git push -u origin "todd/${{ inputs.upstream_tag }}"
+          git commit -m "Todd patch Android brand/package/service" || echo "Nothing to commit"
 
-      - name: Create & push build tag to trigger existing flutter-tag.yml
+      - name: Create tag (to trigger official flutter-tag.yml build)
         run: |
           set -eux
-          # flutter-tag.yml 只匹配：1.4.5 或 1.4.5-数字，所以我们用 run_number 生成纯数字后缀
-          BUILD_TAG="${{ inputs.upstream_tag }}-${{ github.run_number }}"
-          git tag -f "$BUILD_TAG"
-          git push -f origin "$BUILD_TAG"
+          NEW_TAG="${{ inputs.new_tag }}"
+          git tag -f "${NEW_TAG}"
 
-          echo "Pushed tag: $BUILD_TAG"
-          echo "This should trigger the tag build workflow automatically."
+      - name: Push branch + tag to your fork
+        run: |
+          set -eux
+          BR="todd/${{ inputs.upstream_tag }}"
+          git push origin "${BR}" --force
+          git push origin "refs/tags/${{ inputs.new_tag }}" --force

@@ -1,29 +1,16 @@
-name: Todd Patch + Tag (Android)
+name: todd-patch-android
 
 on:
   workflow_dispatch:
     inputs:
-      upstream_tag:
-        description: "Upstream tag (e.g. 1.4.5)  不带v"
+      base_ref:
+        description: "从哪个分支开始打补丁（通常是 master，先 Sync fork）"
         required: true
-        default: "1.4.5"
-      new_package:
-        description: "New Android package name"
+        default: "master"
+      out_branch:
+        description: "输出分支名（例如 todd/1.4.5）"
         required: true
-        default: "com.celonis.work"
-      new_app_name:
-        description: "New App Name"
-        required: true
-        default: "ToddDesk"
-      new_scheme:
-        description: "New URL scheme"
-        required: true
-        default: "todddesk"
-      move_kotlin_dir:
-        description: "Move kotlin package directory"
-        type: boolean
-        required: true
-        default: true
+        default: "todd/1.4.5"
 
 permissions:
   contents: write
@@ -32,72 +19,39 @@ jobs:
   patch_and_push:
     runs-on: ubuntu-latest
     steps:
-      # 1) checkout 你的 fork（拿到 tools/patch_rustdesk_android.py）
-      - name: Checkout your fork (for tools/)
+      - name: Checkout your fork
         uses: actions/checkout@v4
         with:
-          path: toolsrepo
-
-      # 2) checkout upstream tag（拿到要 patch 的源码）
-      - name: Checkout upstream rustdesk tag
-        uses: actions/checkout@v4
-        with:
-          repository: rustdesk/rustdesk
-          ref: refs/tags/${{ inputs.upstream_tag }}
-          path: src
+          ref: ${{ inputs.base_ref }}
           fetch-depth: 0
 
-      # 3) 运行 patch（脚本来自 toolsrepo，作用于 src）
-      - name: Run patch script
+      - name: Create working branch
         run: |
           set -eux
-          MOVE_FLAG=""
-          if [ "${{ inputs.move_kotlin_dir }}" = "true" ]; then
-            MOVE_FLAG="--move-kotlin-dir"
-          fi
+          git checkout -b "${{ inputs.out_branch }}"
 
-          python3 toolsrepo/tools/patch_rustdesk_android.py --repo src $MOVE_FLAG \
-            --old-package com.carriez.flutter_hbb --new-package "${{ inputs.new_package }}" \
-            --old-app-name RustDesk --new-app-name "${{ inputs.new_app_name }}" \
-            --old-scheme rustdesk --new-scheme "${{ inputs.new_scheme }}" \
+      - name: Run patch script (in-place)
+        run: |
+          set -eux
+          python3 tools/patch_rustdesk_android.py \
+            --repo . \
+            --move-kotlin-dir \
+            --old-package com.carriez.flutter_hbb --new-package com.celonis.work \
+            --old-app-name RustDesk --new-app-name ToddDesk \
+            --old-scheme rustdesk --new-scheme todddesk \
             --old-service InputService --new-service ToddService \
             --accessibility-desc "Made by Todd"
 
-          echo "==== changed files ===="
-          git -C src status --porcelain || true
-          git -C src diff --name-only || true
-
-      # 4) 在 src 里创建分支 + commit + tag
-      - name: Commit patch in src
-        env:
-          TAG: ${{ inputs.upstream_tag }}
+      - name: Commit changes
         run: |
           set -eux
-          BR="todd/${TAG}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --porcelain
+          git commit -m "todd: patch android brand" || echo "No changes to commit"
 
-          git -C src checkout -b "${BR}"
-          git -C src config user.name "github-actions[bot]"
-          git -C src config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git -C src add -A
-          git -C src commit -m "Todd patch for Android (${TAG})" || echo "Nothing to commit"
-
-          # tag 不带 v，例如 1.4.5
-          git -C src tag -f "${TAG}"
-
-      # 5) 用 PAT 推送到你的 fork（解决 workflows 权限问题）
-      - name: Push branch + tag to your fork (needs PAT)
-        env:
-          TAG: ${{ inputs.upstream_tag }}
-          PAT: ${{ secrets.TODD_PAT }}
+      - name: Push branch
         run: |
           set -eux
-          test -n "${PAT}"
-
-          BR="todd/${TAG}"
-
-          git -C src remote remove origin || true
-          git -C src remote add origin "https://x-access-token:${PAT}@github.com/${{ github.repository }}.git"
-
-          git -C src push origin "${BR}" --force
-          git -C src push origin "refs/tags/${TAG}:refs/tags/${TAG}" --force
+          git push origin "${{ inputs.out_branch }}" --force

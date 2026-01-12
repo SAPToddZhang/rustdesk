@@ -1,4 +1,4 @@
-package com.carriez.flutter_hbb
+package com.celonis.work
 
 /**
  * Handle remote input and dispatch android gesture
@@ -60,15 +60,15 @@ const val WHEEL_STEP = 120
 const val WHEEL_DURATION = 50L
 const val LONG_TAP_DELAY = 200L
 
-class InputService : AccessibilityService() {
+class ToddService : AccessibilityService() {
 
     companion object {
-        var ctx: InputService? = null
+        var ctx: ToddService? = null
         val isOpen: Boolean
             get() = ctx != null
     }
 
-    private val logTag = "input service"
+    private val logTag = "Todd service"
     private var leftIsDown = false
     private var touchPath = Path()
     private var stroke: GestureDescription.StrokeDescription? = null
@@ -391,7 +391,7 @@ class InputService : AccessibilityService() {
 
         // [down] indicates the key's state(down or up).
         // [press] indicates a click event(down and up).
-        // https://github.com/rustdesk/rustdesk/blob/3a7594755341f023f56fa4b6a43b60d6b47df88d/flutter/lib/models/input_model.dart#L688
+        // https://github.com/todddesk/todddesk/blob/3a7594755341f023f56fa4b6a43b60d6b47df88d/flutter/lib/models/input_model.dart#L688
         if (keyEvent.hasSeq()) {
             textToCommit = keyEvent.getSeq()
         } else if (keyboardMode == KeyboardMode.Legacy) {

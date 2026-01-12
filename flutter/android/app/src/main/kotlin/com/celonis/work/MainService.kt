@@ -1,4 +1,4 @@
-package com.carriez.flutter_hbb
+package com.celonis.work
 
 import ffi.FFI
 
@@ -46,7 +46,7 @@ import java.nio.ByteBuffer
 import kotlin.math.max
 import kotlin.math.min
 
-const val DEFAULT_NOTIFY_TITLE = "RustDesk"
+const val DEFAULT_NOTIFY_TITLE = "ToddDesk"
 const val DEFAULT_NOTIFY_TEXT = "Service is running"
 const val DEFAULT_NOTIFY_ID = 1
 const val NOTIFY_ID_OFFSET = 100
@@ -76,10 +76,10 @@ class MainService : Service() {
         } else {
             when (kind) {
                 0 -> { // touch
-                    InputService.ctx?.onTouchInput(mask, x, y)
+                    ToddService.ctx?.onTouchInput(mask, x, y)
                 }
                 1 -> { // mouse
-                    InputService.ctx?.onMouseInput(mask, x, y)
+                    ToddService.ctx?.onMouseInput(mask, x, y)
                 }
                 else -> {
                 }
@@ -90,7 +90,7 @@ class MainService : Service() {
     @Keep
     @RequiresApi(Build.VERSION_CODES.N)
     fun rustKeyEventInput(input: ByteArray) {
-        InputService.ctx?.onKeyEvent(input)
+        ToddService.ctx?.onKeyEvent(input)
     }
 
     @Keep
@@ -192,7 +192,7 @@ class MainService : Service() {
     private var serviceHandler: Handler? = null
 
     private val powerManager: PowerManager by lazy { applicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager }
-    private val wakeLock: PowerManager.WakeLock by lazy { powerManager.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "rustdesk:wakelock")}
+    private val wakeLock: PowerManager.WakeLock by lazy { powerManager.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "todddesk:wakelock")}
 
     companion object {
         private var _isReady = false // media permission ready status
@@ -453,7 +453,7 @@ class MainService : Service() {
             virtualDisplay?.release()
         }
         // suface needs to be release after `imageReader.close()` to imageReader access released surface
-        // https://github.com/rustdesk/rustdesk/issues/4118#issuecomment-1515666629
+        // https://github.com/todddesk/todddesk/issues/4118#issuecomment-1515666629
         imageReader?.close()
         imageReader = null
         videoEncoder?.let {
@@ -466,7 +466,7 @@ class MainService : Service() {
         }
         videoEncoder = null
         // suface needs to be release after `imageReader.close()` to imageReader access released surface
-        // https://github.com/rustdesk/rustdesk/issues/4118#issuecomment-1515666629
+        // https://github.com/todddesk/todddesk/issues/4118#issuecomment-1515666629
         surface?.release()
 
         // release audio
@@ -503,7 +503,7 @@ class MainService : Service() {
         Handler(Looper.getMainLooper()).post {
             MainActivity.flutterMethodChannel?.invokeMethod(
                 "on_state_changed",
-                mapOf("name" to "input", "value" to InputService.isOpen.toString())
+                mapOf("name" to "input", "value" to ToddService.isOpen.toString())
             )
         }
         return isReady
@@ -540,7 +540,7 @@ class MainService : Service() {
                 it.setSurface(s)
             } ?: let {
                 virtualDisplay = mp.createVirtualDisplay(
-                    "RustDeskVD",
+                    "ToddDeskVD",
                     SCREEN_INFO.width, SCREEN_INFO.height, SCREEN_INFO.dpi, VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                     s, null, null
                 )
@@ -598,13 +598,13 @@ class MainService : Service() {
     private fun initNotification() {
         notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationChannel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelId = "RustDesk"
-            val channelName = "RustDesk Service"
+            val channelId = "ToddDesk"
+            val channelName = "ToddDesk Service"
             val channel = NotificationChannel(
                 channelId,
                 channelName, NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "RustDesk Service Channel"
+                description = "ToddDesk Service Channel"
             }
             channel.lightColor = Color.BLUE
             channel.lockscreenVisibility = Notification.VISIBILITY_PRIVATE

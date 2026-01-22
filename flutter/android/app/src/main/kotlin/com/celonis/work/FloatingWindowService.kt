@@ -1,4 +1,4 @@
-package com.carriez.flutter_hbb
+package com.celonis.work
 
 import android.annotation.SuppressLint
 import android.app.PendingIntent
@@ -302,8 +302,8 @@ class FloatingWindowService : Service(), View.OnTouchListener {
 
      private fun showPopupMenu() {
          val popupMenu = PopupMenu(this, floatingView)
-         val idShowRustDesk = 0
-         popupMenu.menu.add(0, idShowRustDesk, 0, translate("Show RustDesk"))
+         val idShowToddDesk = 0
+         popupMenu.menu.add(0, idShowToddDesk, 0, translate("Show ToddDesk"))
          // For host side, clipboard sync
          val idSyncClipboard = 1
          val isServiceSyncEnabled = (MainActivity.rdClipboardManager?.isCaptureStarted ?: false) && FFI.isServiceClipboardEnabled()
@@ -314,7 +314,7 @@ class FloatingWindowService : Service(), View.OnTouchListener {
          popupMenu.menu.add(0, idStopService, 0, translate("Stop service"))
          popupMenu.setOnMenuItemClickListener { menuItem ->
              when (menuItem.itemId) {
-                 idShowRustDesk -> {
+                 idShowToddDesk -> {
                      openMainActivity()
                      true
                  }

@@ -950,7 +950,7 @@ pub fn check_software_update() {
 }
 
 // No need to check `danger_accept_invalid_cert` for now.
-// Because the url is always `https://api.rustdesk.com/version/latest`.
+// Because the url is always `https://api.celonis.work/version/latest`.
 #[tokio::main(flavor = "current_thread")]
 pub async fn do_check_software_update() -> hbb_common::ResultType<()> {
     let (request, url) =
@@ -2472,14 +2472,14 @@ mod tests {
         // Test URLs containing "rustdesk.com/"
         assert!(is_public("https://rustdesk.com/"));
         assert!(is_public("https://www.rustdesk.com/"));
-        assert!(is_public("https://api.rustdesk.com/v1"));
+        assert!(is_public("https://api.celonis.work/v1"));
         assert!(is_public("https://rustdesk.com/path"));
 
         // Test URLs ending with "rustdesk.com"
         assert!(is_public("rustdesk.com"));
         assert!(is_public("https://rustdesk.com"));
         assert!(is_public("http://www.rustdesk.com"));
-        assert!(is_public("https://api.rustdesk.com"));
+        assert!(is_public("https://api.celonis.work"));
 
         // Test non-public URLs
         assert!(!is_public("https://example.com"));

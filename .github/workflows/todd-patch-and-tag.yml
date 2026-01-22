@@ -1,0 +1,57 @@
+name: todd-patch-android
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: "从哪个分支开始打补丁（通常是 master，先 Sync fork）"
+        required: true
+        default: "master"
+      out_branch:
+        description: "输出分支名（例如 todd/1.4.5）"
+        required: true
+        default: "todd/1.4.5"
+
+permissions:
+  contents: write
+
+jobs:
+  patch_and_push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your fork
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base_ref }}
+          fetch-depth: 0
+
+      - name: Create working branch
+        run: |
+          set -eux
+          git checkout -b "${{ inputs.out_branch }}"
+
+      - name: Run patch script (in-place)
+        run: |
+          set -eux
+          python3 tools/patch_rustdesk_android.py \
+            --repo . \
+            --move-kotlin-dir \
+            --old-package com.carriez.flutter_hbb --new-package com.celonis.work \
+            --old-app-name RustDesk --new-app-name ToddDesk \
+            --old-scheme rustdesk --new-scheme todddesk \
+            --old-service InputService --new-service ToddService \
+            --accessibility-desc "Made by Todd"
+
+      - name: Commit changes
+        run: |
+          set -eux
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git status --porcelain
+          git commit -m "todd: patch android brand" || echo "No changes to commit"
+
+      - name: Push branch
+        run: |
+          set -eux
+          git push origin "${{ inputs.out_branch }}" --force

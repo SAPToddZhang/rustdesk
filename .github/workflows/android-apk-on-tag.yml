@@ -1,0 +1,60 @@
+name: Android APK on Release Tag
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "release-*"
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: flutter
+        run: flutter pub get
+
+      # 可选：如果你仓库里有原生编译脚本就跑一下（没有就跳过）
+      - name: Build native (optional)
+        run: |
+          set -e
+          if [ -f "./flutter/build_android.sh" ]; then
+            chmod +x ./flutter/build_android.sh
+            ./flutter/build_android.sh
+          elif [ -f "./ci/build-android.sh" ]; then
+            chmod +x ./ci/build-android.sh
+            ./ci/build-android.sh
+          else
+            echo "No native build script found, skip."
+          fi
+
+      - name: Build APK (release, split per ABI)
+        working-directory: flutter
+        run: |
+          set -e
+          flutter build apk --release --split-per-abi
+
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rustdesk-android-apk-${{ github.ref_name }}
+          path: flutter/build/app/outputs/flutter-apk/*.apk

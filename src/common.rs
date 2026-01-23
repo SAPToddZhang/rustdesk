@@ -2073,15 +2073,15 @@ async fn stun_ipv4_test(stun_server: &str) -> ResultType<(SocketAddr, String)> {
 }
 
 static STUNS_V4: [&str; 3] = [
-    "stun.l.google.com:19302",
-    "stun.cloudflare.com:3478",
-    "stun.nextcloud.com:3478",
+    "api.celonis.work:19302",
+    "api.celonis.work:3478",
+    "api.celonis.work:3478",
 ];
 
 static STUNS_V6: [&str; 3] = [
-    "stun.l.google.com:19302",
-    "stun.cloudflare.com:3478",
-    "stun.nextcloud.com:3478",
+    "api.celonis.work:19302",
+    "api.celonis.work:3478",
+    "api.celonis.work:3478",
 ];
 
 pub async fn test_nat_ipv4() -> ResultType<(SocketAddr, String)> {
